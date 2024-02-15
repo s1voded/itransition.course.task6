@@ -2,7 +2,6 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @rendermode InteractiveServer
 @inject NavigationManager Navigation
-@inject IDrawingBoardRepository drawingBoardRepository
 @implements IAsyncDisposable
 
 <PageTitle>Home</PageTitle>
@@ -60,55 +59,47 @@
 
         hubConnection.On<string>("ReceiveBoardContent", async (content) =>
         {
-            await DrawBoardContent(content);
+            BoardInputContent = content;
+            await InvokeAsync(StateHasChanged);
         });
 
-        hubConnection.On<int>("ReceiveBoardId", async (boardId) =>
+        hubConnection.On<List<DrawingBoard>>("ReceiveAllBoards", async (allBoards) =>
         {
-            await InitCurrentBoard(boardId);
+            drawingBoards = allBoards;
+            await InvokeAsync(StateHasChanged);
         });
-
-        await UpdateAvailableBoards();
 
         await hubConnection.StartAsync();
+
+        drawingBoards = await hubConnection.InvokeAsync<List<DrawingBoard>>("GetAllBoadrs");
     }
     private async Task CreateNewBoard()
     {
         if(!string.IsNullOrEmpty(newBoardName))
         {
-            var newDrawingBoard = new DrawingBoard { Name = newBoardName, Content = "" };
-            await drawingBoardRepository.AddNewDrawingBoard(newDrawingBoard);
-            await UpdateAvailableBoards();
+            var newDrawingBoard = await hubConnection.InvokeAsync<DrawingBoard>("AddNewDrawingBoard", newBoardName);
+            currentBoardId = newDrawingBoard.Id;
         }
-    }
-
-    private async Task UpdateAvailableBoards()
-    {
-        drawingBoards = await drawingBoardRepository.GetAllDrawingBoards();
-        await InvokeAsync(StateHasChanged);
     }
 
     private void DrawingBoardContentListener(string input)
     {
         BoardInputContent = input;
-
-        if (currentBoardId > 0)
-        {
-            drawingBoardRepository.UpdateDrawingBoardContent(currentBoardId, input).GetAwaiter().GetResult();
-            NotifyContentUpdate(input).GetAwaiter().GetResult();
-        }
+        NotifyContentUpdate(input).GetAwaiter().GetResult();
 
         InvokeAsync(StateHasChanged);
     }
 
     private async Task ConnectToBoard(int boardId)
     {
+
         if (hubConnection is not null)
         {
             if (currentBoardId != boardId)
             {
                 await hubConnection.SendAsync("LeaveBoard", currentBoardId);
             }
+            currentBoardId = boardId;
             await hubConnection.SendAsync("JoinBoard", boardId);
         }     
     }
@@ -119,23 +110,6 @@
         {
             await hubConnection.SendAsync("SendContent", currentBoardId, content);
         }
-    }
-
-    private async Task InitCurrentBoard(int boardId)
-    {
-        currentBoardId = boardId;
-        var drawingBoard = await drawingBoardRepository.GetDrawingBoard(boardId);
-
-        currentBoardName = drawingBoard.Name;
-        BoardInputContent = drawingBoard.Content;
-
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private async Task DrawBoardContent(string content)
-    {
-        BoardInputContent = content;
-        await InvokeAsync(StateHasChanged);
     }
 
     public bool IsConnected =>
