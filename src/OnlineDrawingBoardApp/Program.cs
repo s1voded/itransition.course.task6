@@ -1,5 +1,9 @@
 using KristofferStrube.Blazor.SVGEditor.Extensions;
+using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.EntityFrameworkCore;
 using OnlineDrawingBoardApp.Components;
+using OnlineDrawingBoardApp.Data;
+using OnlineDrawingBoardApp.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,7 +11,13 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddResponseCompression(opts => opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(["application/octet-stream"]));
+
 builder.Services.AddSVGEditor();
+
+builder.Services.AddScoped<IDrawingBoardRepository, DrawingBoardRepository>();
+
+builder.Services.AddDbContext<DrawingBoardContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
 
@@ -26,5 +36,7 @@ app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+app.MapHub<DrawingHub>("/drawinghub");
 
 app.Run();

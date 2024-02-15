@@ -1,20 +1,151 @@
 ﻿@page "/"
+@using Microsoft.AspNetCore.SignalR.Client
 @rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject IDrawingBoardRepository drawingBoardRepository
+@implements IAsyncDisposable
 
 <PageTitle>Home</PageTitle>
 
-<h1>Hello, world!</h1>
+<h6>Current board name: @currentBoardName</h6>
+
+<div class="row row-cols-1 row-cols-md-4 g-4">
+    @foreach (var drawingBoard in drawingBoards)
+    {
+    <div class="col">
+            <div class="card text-center h-100">
+            <svg width="100%" height="100%" viewBox="0 0 1600 800">@((MarkupString)drawingBoard.Content)</svg>
+            <div class="card-body">
+                    <h5 class="card-title">
+                        <button type="button" class="btn btn-outline-primary" @onclick="() => ConnectToBoard(drawingBoard.Id)" data-toggle="tooltip" data-placement="top" title="Join to board">@drawingBoard.Name</button>
+                    </h5>
+            </div>
+        </div>
+    </div>
+    }
+    <div class="col">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <div class="input-group mb-3">
+                        <input @bind=newBoardName type="text" class="form-control" placeholder="New board name" aria-label="Board name" aria-describedby="basic-addon1">
+                    </div>
+                </h5>
+                <p class="card-text">
+                    <button type="button" class="btn btn-outline-success" @onclick="() => CreateNewBoard()">Create new</button>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div style="height:80vh">
-    <SVGEditor Input=@Input InputUpdated="DrawingBoardUpdate" SelectionMode="SelectionMode.WindowSelection" DisableZoom=true DisableScaleLabel=true/>
+    <SVGEditor Input=@BoardInputContent InputUpdated="DrawingBoardContentListener" SelectionMode="SelectionMode.WindowSelection" DisableZoom=true DisableScaleLabel=true/>
 </div>
 
 @code {
-    protected string Input = @"";
+    protected string BoardInputContent = @"";
+    private HubConnection? hubConnection;
+    private List<DrawingBoard> drawingBoards = [];
+    private int currentBoardId;
+    private string currentBoardName;
+    private string newBoardName = "";
 
-    private void DrawingBoardUpdate(string input)
+    protected override async Task OnInitializedAsync()
     {
-        Input = input;
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/drawinghub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<string>("ReceiveBoardContent", async (content) =>
+        {
+            await DrawBoardContent(content);
+        });
+
+        hubConnection.On<int>("ReceiveBoardId", async (boardId) =>
+        {
+            await InitCurrentBoard(boardId);
+        });
+
+        await UpdateAvailableBoards();
+
+        await hubConnection.StartAsync();
+    }
+    private async Task CreateNewBoard()
+    {
+        if(!string.IsNullOrEmpty(newBoardName))
+        {
+            var newDrawingBoard = new DrawingBoard { Name = newBoardName, Content = "" };
+            await drawingBoardRepository.AddNewDrawingBoard(newDrawingBoard);
+            await UpdateAvailableBoards();
+        }
+    }
+
+    private async Task UpdateAvailableBoards()
+    {
+        drawingBoards = await drawingBoardRepository.GetAllDrawingBoards();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void DrawingBoardContentListener(string input)
+    {
+        BoardInputContent = input;
+
+        if (currentBoardId > 0)
+        {
+            drawingBoardRepository.UpdateDrawingBoardContent(currentBoardId, input).GetAwaiter().GetResult();
+            NotifyContentUpdate(input).GetAwaiter().GetResult();
+        }
+
         InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ConnectToBoard(int boardId)
+    {
+        if (hubConnection is not null)
+        {
+            if (currentBoardId != boardId)
+            {
+                await hubConnection.SendAsync("LeaveBoard", currentBoardId);
+            }
+            await hubConnection.SendAsync("JoinBoard", boardId);
+        }     
+    }
+
+    private async Task NotifyContentUpdate(string content)
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.SendAsync("SendContent", currentBoardId, content);
+        }
+    }
+
+    private async Task InitCurrentBoard(int boardId)
+    {
+        currentBoardId = boardId;
+        var drawingBoard = await drawingBoardRepository.GetDrawingBoard(boardId);
+
+        currentBoardName = drawingBoard.Name;
+        BoardInputContent = drawingBoard.Content;
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task DrawBoardContent(string content)
+    {
+        BoardInputContent = content;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public bool IsConnected =>
+        hubConnection?.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
     }
 }
