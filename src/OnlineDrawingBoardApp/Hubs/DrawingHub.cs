@@ -41,7 +41,7 @@ namespace OnlineDrawingBoardApp.Hubs
         {
             var drawingBoard = await _drawingBoardRepository.GetDrawingBoard(drawingBoardId);
             await Groups.AddToGroupAsync(Context.ConnectionId, drawingBoardId.ToString());
-            await Clients.Caller.ReceiveBoardContent(drawingBoard.Content);
+            await Clients.Caller.ReceiveBoardAfterJoin(drawingBoard);
         }
 
         public async Task LeaveBoard(int drawingBoardId)
@@ -53,9 +53,7 @@ namespace OnlineDrawingBoardApp.Hubs
     public interface IDrawingClient
     {
         Task ReceiveBoardContent(string drawingBoardContent);
-
-        Task ReceiveBoardId(int drawingBoardId);
-
+        Task ReceiveBoardAfterJoin(DrawingBoard drawingBoard);
         Task ReceiveAllBoards(List<DrawingBoard> drawingBoards);
     }
 }
