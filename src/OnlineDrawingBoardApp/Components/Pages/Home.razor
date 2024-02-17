@@ -57,7 +57,7 @@ else
     private List<DrawingBoard> drawingBoards = [];
     private DrawingBoard currentDrawingBoard = new DrawingBoard();
     private string newBoardName = "";
-    //SVGEditor svgEditor;
+    private bool joinedToBoard;
 
     protected override async Task OnInitializedAsync()
     {
@@ -74,6 +74,7 @@ else
 
         hubConnection.On<DrawingBoard>("ReceiveBoardAfterJoin", async (drawingBoard) =>
         {
+            joinedToBoard = true;
             currentDrawingBoard = drawingBoard;
             DrawContentOnBoardAndPreview(drawingBoard.Content);
             await InvokeAsync(StateHasChanged);
@@ -102,21 +103,23 @@ else
     private void DrawingBoardContentListener(string input)
     {
         DrawContentOnBoardAndPreview(input);
-        NotifyContentUpdate(input).GetAwaiter().GetResult();
+        if(joinedToBoard) NotifyContentUpdate(input).GetAwaiter().GetResult();
         InvokeAsync(StateHasChanged);
     }
 
     private void DrawContentOnBoardAndPreview(string content)
     {
         BoardInputContent = content;
-        drawingBoards.FirstOrDefault(d => d.Id == currentDrawingBoard.Id).Content = content;
+        if(joinedToBoard) drawingBoards.FirstOrDefault(d => d.Id == currentDrawingBoard.Id).Content = content;
     }
 
     private async Task ConnectToBoard(int boardId)
     {
+        if (currentDrawingBoard.Id == boardId) return;
+
         if (hubConnection is not null)
         {
-            if (currentDrawingBoard.Id != boardId)
+            if (joinedToBoard)
             {
                 await hubConnection.SendAsync("LeaveBoard", currentDrawingBoard.Id);
             }
