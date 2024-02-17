@@ -19,21 +19,34 @@
     }
     <div class="col">
         <div class="card text-center h-100">
+            <div class="card-header bg-transparent">Create new</div>
             <div class="card-body">
                 <h5 class="card-title">
                     <div class="input-group mb-3">
-                        <input @bind=newBoardName type="text" class="form-control" placeholder="New board name" aria-label="Board name" aria-describedby="basic-addon1">
+                        <input @bind=newBoardName type="text" class="form-control" placeholder="Board name" aria-label="Board name" aria-describedby="basic-addon1">
                     </div>
                 </h5>
                 <p class="card-text">
-                    <button type="button" class="btn btn-outline-success" @onclick="() => CreateNewBoard()">Create new</button>
+                    <button type="button" class="btn btn-outline-success" @onclick="() => CreateNewBoard()">Create</button>
                 </p>
             </div>
         </div>
     </div>
 </div>
+<p></p>
+@if (string.IsNullOrEmpty(currentDrawingBoard.Name))
+{
+    <div class="alert text-center alert-secondary" role="alert">
+        You are not joined to any board. Join or create a new board.
+    </div>
+}
+else
+{
+    <div class="alert text-center alert-success" role="alert">
+        You've joined the board: @currentDrawingBoard.Name
+    </div>
+}
 
-<h3>Current board: @currentDrawingBoard.Name</h3>
 <div style="height:80vh">
     <SVGEditor Input=@BoardInputContent InputUpdated="DrawingBoardContentListener" SelectionMode="SelectionMode.WindowSelection" DisableZoom=true DisableScaleLabel=true/>
 </div>
