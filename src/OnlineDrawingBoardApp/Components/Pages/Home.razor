@@ -94,7 +94,7 @@ else
     {
         if(!string.IsNullOrEmpty(newBoardName))
         {
-            var newDrawingBoard = await hubConnection.InvokeAsync<DrawingBoard>("AddNewDrawingBoard", newBoardName);
+            var newDrawingBoard = await hubConnection.InvokeAsync<DrawingBoard>("AddNewDrawingBoard", newBoardName, joinedToBoard ? "" : BoardInputContent);
             await ConnectToBoard(newDrawingBoard.Id);
             newBoardName = "";
         }
@@ -135,8 +135,7 @@ else
         }
     }
 
-    public bool IsConnected =>
-        hubConnection?.State == HubConnectionState.Connected;
+    public bool IsConnected => hubConnection?.State == HubConnectionState.Connected;
 
     public async ValueTask DisposeAsync()
     {

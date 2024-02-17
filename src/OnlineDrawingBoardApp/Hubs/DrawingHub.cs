@@ -25,9 +25,9 @@ namespace OnlineDrawingBoardApp.Hubs
             return allDrawingBoards;
         }
 
-        public async Task<DrawingBoard> AddNewDrawingBoard(string newBoardName)
+        public async Task<DrawingBoard> AddNewDrawingBoard(string newBoardName, string content)
         {
-            var newDrawingBoard = new DrawingBoard { Name = newBoardName, Content = "" };
+            var newDrawingBoard = new DrawingBoard { Name = newBoardName, Content = content };
             var createdDrawingBoard = await _drawingBoardRepository.AddNewDrawingBoard(newDrawingBoard);
 
             var allDrawingBoards = await _drawingBoardRepository.GetAllDrawingBoards();
